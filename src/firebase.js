@@ -3,8 +3,11 @@ import { readFileSync } from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-const keyPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './serviceAccountKey.json';
-const serviceAccount = JSON.parse(readFileSync(keyPath, 'utf-8'));
+// On Vercel there's no file to mount, so the key is set as a raw JSON string in
+// FIREBASE_SERVICE_ACCOUNT_JSON. Locally, FIREBASE_SERVICE_ACCOUNT_PATH points at the file.
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
+  : JSON.parse(readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './serviceAccountKey.json', 'utf-8'));
 
 initializeApp({ credential: cert(serviceAccount) });
 

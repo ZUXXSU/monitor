@@ -1,9 +1,8 @@
 import { db } from './firebase.js';
 import { SITES, CHECK_TIMEOUT_MS } from './config.js';
 
-// last known state per site, kept in memory to detect up/down transitions
-const lastState = new Map();
-
+// site_state doc per site is the source of truth for last-known status —
+// an in-memory Map would reset on every cold start when run as a serverless function.
 async function pingSite(site) {
   const started = Date.now();
   const controller = new AbortController();
@@ -44,7 +43,10 @@ export async function checkAllSites() {
       timestamp,
     });
 
-    const prevUp = lastState.get(site.name);
+    const stateRef = db.collection('site_state').doc(site.name);
+    const prevSnap = await stateRef.get();
+    const prevUp = prevSnap.exists ? prevSnap.data().up : undefined;
+
     if (prevUp !== result.up) {
       await db.collection('incidents').add({
         site: site.name,
@@ -56,7 +58,7 @@ export async function checkAllSites() {
       });
       console.log(`[${timestamp.toISOString()}] ${site.name} changed state -> ${result.up ? 'UP' : 'DOWN'}`);
     }
-    lastState.set(site.name, result.up);
+    await stateRef.set({ up: result.up, statusCode: result.statusCode, updatedAt: timestamp });
 
     console.log(`[${timestamp.toISOString()}] ${site.name} (${site.url}) up=${result.up} status=${result.statusCode} ${result.responseTimeMs}ms ${result.error || ''}`);
 
@@ -66,6 +68,7 @@ export async function checkAllSites() {
   return results;
 }
 
-export function getLastState() {
-  return Object.fromEntries(lastState);
+export async function getLastState() {
+  const snap = await db.collection('site_state').get();
+  return Object.fromEntries(snap.docs.map((d) => [d.id, d.data().up]));
 }
