@@ -2,8 +2,8 @@ import 'dotenv/config';
 
 export const SITES = [
   { name: 'buzzit-prod', url: 'https://app.buzzit.in/health' },
-  { name: 'buzzit-beta', url: 'https://beta.buzzit.in' },
-  { name: 'buzzit-stage', url: 'https://stage.buzzit.in' },
+  { name: 'buzzit-beta', url: 'https://beta.buzzit.in/health' },
+  { name: 'buzzit-stage', url: 'https://stage.buzzit.in/health' },
 ];
 
 export const CHECK_INTERVAL_MINUTES = Number(process.env.CHECK_INTERVAL_MINUTES || 5);
