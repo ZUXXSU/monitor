@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { checkAllSites, getLastState } from './monitor.js';
 import { cleanupOldLogs } from './cleanup.js';
 import { db } from './firebase.js';
+import { requireAuth } from './authMiddleware.js';
 import { PORT, CHECK_INTERVAL_MINUTES, SITES } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,7 +21,7 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, uptimeSec: process.uptime(), startedAt });
 });
 
-app.get('/status', async (req, res) => {
+app.get('/status', requireAuth, async (req, res) => {
   res.json({ sites: SITES.map((s) => s.name), lastState: await getLastState() });
 });
 
@@ -37,7 +38,7 @@ app.get('/api/cron', async (req, res) => {
 });
 
 // recent raw checks, newest first
-app.get('/api/checks', async (req, res) => {
+app.get('/api/checks', requireAuth, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   let q = db.collection('uptime_checks').orderBy('timestamp', 'desc').limit(limit);
   if (req.query.site) q = q.where('site', '==', req.query.site);
@@ -46,7 +47,7 @@ app.get('/api/checks', async (req, res) => {
 });
 
 // up/down transitions, newest first
-app.get('/api/incidents', async (req, res) => {
+app.get('/api/incidents', requireAuth, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   let q = db.collection('incidents').orderBy('timestamp', 'desc').limit(limit);
   if (req.query.site) q = q.where('site', '==', req.query.site);

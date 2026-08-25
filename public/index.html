@@ -7,7 +7,7 @@
 <style>
   :root { color-scheme: dark; }
   body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #0f1115; color: #e6e6e6; margin: 0; padding: 24px; }
-  h1 { font-size: 18px; margin: 0 0 16px; }
+  h1 { font-size: 18px; margin: 0 0 16px; display: flex; align-items: center; justify-content: space-between; }
   .cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
   .card { background: #171a21; border: 1px solid #262a33; border-radius: 8px; padding: 14px 18px; min-width: 180px; }
   .card .name { font-size: 13px; color: #9aa0aa; margin-bottom: 6px; }
@@ -24,32 +24,136 @@
   tr.down-row { color: #ff5c5c; }
   .muted { color: #666; font-size: 12px; margin-top: 4px; }
   #refreshed { color: #666; font-size: 12px; }
+
+  button { font: inherit; cursor: pointer; }
+  #signout-btn { background: #171a21; border: 1px solid #262a33; color: #e6e6e6; border-radius: 6px; padding: 6px 12px; font-size: 13px; }
+  #signout-btn:hover { background: #20232b; }
+
+  #login-screen { max-width: 320px; margin: 15vh auto 0; }
+  #login-screen h1 { justify-content: center; margin-bottom: 20px; }
+  #login-form { display: flex; flex-direction: column; gap: 10px; }
+  #login-form input { font: inherit; background: #171a21; border: 1px solid #262a33; color: #e6e6e6; border-radius: 6px; padding: 10px 12px; }
+  #login-form input:focus { outline: 1px solid #35d07f; }
+  #login-form button { background: #35d07f; border: none; color: #0f1115; font-weight: 600; border-radius: 6px; padding: 10px 12px; }
+  #login-form button:disabled { opacity: 0.6; cursor: default; }
+  #login-error { color: #ff5c5c; font-size: 13px; min-height: 16px; }
+
+  #app { display: none; }
 </style>
 </head>
 <body>
-  <h1>buzzit uptime monitor</h1>
-  <div class="cards" id="cards"></div>
 
-  <h2>Incidents (up/down transitions)</h2>
-  <table id="incidents">
-    <thead><tr><th>Time</th><th>Site</th><th>Event</th><th>Status</th><th>Error</th></tr></thead>
-    <tbody></tbody>
-  </table>
+  <div id="login-screen">
+    <h1>buzzit uptime monitor</h1>
+    <form id="login-form">
+      <input type="email" id="login-email" placeholder="email" autocomplete="username" required>
+      <input type="password" id="login-password" placeholder="password" autocomplete="current-password" required>
+      <button type="submit" id="login-btn">Sign in</button>
+      <div id="login-error"></div>
+    </form>
+  </div>
 
-  <h2>Recent checks</h2>
-  <table id="checks">
-    <thead><tr><th>Time</th><th>Site</th><th>Up</th><th>Status</th><th>ms</th><th>Error</th></tr></thead>
-    <tbody></tbody>
-  </table>
+  <div id="app">
+    <h1>
+      buzzit uptime monitor
+      <button id="signout-btn">Sign out</button>
+    </h1>
+    <div class="cards" id="cards"></div>
 
-  <div id="refreshed"></div>
+    <h2>Incidents (up/down transitions)</h2>
+    <table id="incidents">
+      <thead><tr><th>Time</th><th>Site</th><th>Event</th><th>Status</th><th>Error</th></tr></thead>
+      <tbody></tbody>
+    </table>
 
-<script>
+    <h2>Recent checks</h2>
+    <table id="checks">
+      <thead><tr><th>Time</th><th>Site</th><th>Up</th><th>Status</th><th>ms</th><th>Error</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <div id="refreshed"></div>
+  </div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+// Client web config — safe to expose publicly, access is enforced by Firebase Auth,
+// not by hiding this. Server-side (src/authMiddleware.js) verifies the ID token.
+const firebaseConfig = {
+  apiKey: "AIzaSyBZKPu4ylJ3gDqMC06X_cFys-44fM86akk",
+  authDomain: "its-business-1d88b.firebaseapp.com",
+  projectId: "its-business-1d88b",
+  storageBucket: "its-business-1d88b.firebasestorage.app",
+  messagingSenderId: "56176915181",
+  appId: "1:56176915181:web:758e0c5928f5b59e77d2e4",
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+
+const loginScreen = document.getElementById('login-screen');
+const appScreen = document.getElementById('app');
+const loginForm = document.getElementById('login-form');
+const loginBtn = document.getElementById('login-btn');
+const loginError = document.getElementById('login-error');
+const signoutBtn = document.getElementById('signout-btn');
+
+let refreshTimer = null;
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  loginError.textContent = '';
+  loginBtn.disabled = true;
+  try {
+    await signInWithEmailAndPassword(
+      auth,
+      document.getElementById('login-email').value,
+      document.getElementById('login-password').value,
+    );
+  } catch (err) {
+    loginError.textContent = 'Sign in failed — check email/password.';
+  } finally {
+    loginBtn.disabled = false;
+  }
+});
+
+signoutBtn.addEventListener('click', () => signOut(auth));
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    loginScreen.style.display = 'none';
+    appScreen.style.display = 'block';
+    load();
+    refreshTimer = setInterval(load, 30000);
+  } else {
+    loginScreen.style.display = 'block';
+    appScreen.style.display = 'none';
+    if (refreshTimer) clearInterval(refreshTimer);
+  }
+});
+
+async function authedFetch(url) {
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 401 || res.status === 403) {
+    await signOut(auth);
+    throw new Error('session expired');
+  }
+  return res.json();
+}
+
 async function load() {
   const [status, incidents, checks] = await Promise.all([
-    fetch('/status').then(r => r.json()),
-    fetch('/api/incidents?limit=50').then(r => r.json()),
-    fetch('/api/checks?limit=100').then(r => r.json()),
+    authedFetch('/status'),
+    authedFetch('/api/incidents?limit=50'),
+    authedFetch('/api/checks?limit=100'),
   ]);
 
   const cardsEl = document.getElementById('cards');
@@ -83,9 +187,6 @@ async function load() {
 
   document.getElementById('refreshed').textContent = 'last refreshed ' + new Date().toLocaleTimeString();
 }
-
-load();
-setInterval(load, 30000);
 </script>
 </body>
 </html>
