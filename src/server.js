@@ -30,8 +30,12 @@ app.get('/status', requireAuth, async (req, res) => {
 // this route every CHECK_INTERVAL_MINUTES instead. Optionally gate it with CRON_SECRET.
 app.get('/api/cron', async (req, res) => {
   const secret = process.env.CRON_SECRET;
-  if (secret && req.query.secret !== secret) {
-    return res.status(401).json({ error: 'unauthorized' });
+  if (secret) {
+    const bearer = req.headers.authorization?.replace('Bearer ', '');
+    const query  = req.query.secret;
+    if (bearer !== secret && query !== secret) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
   }
   const results = await checkAllSites();
   res.json({ ok: true, results });
