@@ -71,11 +71,16 @@ app.get('/api/daily', requireAuth, async (req, res) => {
   }));
 });
 
-// up/down transitions, newest first
+// up/down transitions, newest first; optional ?day=YYYY-MM-DD for day drill-down
 app.get('/api/incidents', requireAuth, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   let q = db.collection('incidents').orderBy('timestamp', 'desc').limit(limit);
   if (req.query.site) q = q.where('site', '==', req.query.site);
+  if (req.query.day) {
+    const start = new Date(req.query.day + 'T00:00:00.000Z');
+    const end   = new Date(req.query.day + 'T23:59:59.999Z');
+    q = q.where('timestamp', '>=', start).where('timestamp', '<=', end);
+  }
   const snap = await q.get();
   res.json(snap.docs.map((d) => ({ id: d.id, ...d.data(), timestamp: d.data().timestamp?.toDate?.() })));
 });

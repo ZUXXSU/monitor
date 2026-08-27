@@ -193,6 +193,7 @@
   .bar.up      { background: var(--bar-up); }
   .bar.partial { background: var(--bar-partial); }
   .bar.down    { background: var(--bar-down); }
+  .bar.selected { box-shadow: 0 0 0 2px #fff; z-index: 1; position: relative; }
   .bars-foot {
     display: flex; justify-content: space-between;
     margin-top: 6px; font-size: 11px; color: var(--muted);
@@ -334,7 +335,7 @@
     </div>
 
     <div class="section">
-      <div class="section-label">Incident History</div>
+      <div class="section-label" id="inc-label">Incident History</div>
       <div class="inc-card" id="inc-card">
         <div class="placeholder">Loading…</div>
       </div>
@@ -485,11 +486,51 @@ function siteAvgMs(daily, site) {
   return tot ? Math.round(wt / tot) : null;
 }
 
+// ── Day drill-down ────────────────────────────────────
+async function loadDay(isoDay, label) {
+  $('inc-label').textContent = `Incidents — ${label}`;
+  $('inc-card').innerHTML = `<div class="placeholder">Loading…</div>`;
+  const incidents = await authedFetch(`/api/incidents?day=${isoDay}&limit=100`);
+  const incCard = $('inc-card');
+  if (!incidents.length) {
+    incCard.innerHTML = `
+      <div class="no-inc">
+        <div class="no-inc-icon">✓</div>
+        No incidents on ${label}
+      </div>`;
+  } else {
+    incCard.innerHTML = incidents.map(inc => {
+      const isDown = inc.event === 'down';
+      const detail = [inc.statusCode ? `HTTP ${inc.statusCode}` : null, inc.error || null].filter(Boolean).join(' · ');
+      return `
+        <div class="inc-item">
+          <div class="inc-icon ${inc.event}">${isDown ? '▼' : '▲'}</div>
+          <div class="inc-body">
+            <div class="inc-site">${inc.site}</div>
+            <span class="inc-tag ${inc.event}">${inc.event.toUpperCase()}</span>
+            ${detail ? `<div class="inc-detail">${detail}</div>` : ''}
+          </div>
+          <div class="inc-time">
+            <div class="ago">${timeAgo(inc.timestamp)}</div>
+            <div class="full">${new Date(inc.timestamp).toLocaleString()}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+}
+
+document.addEventListener('click', e => {
+  const bar = e.target.closest('.bar');
+  if (!bar || !bar.dataset.day) return;
+  document.querySelectorAll('.bar.selected').forEach(b => b.classList.remove('selected'));
+  bar.classList.add('selected');
+  loadDay(bar.dataset.day, bar.dataset.date);
+});
+
 // ── Render ────────────────────────────────────────────
 async function load() {
-  const [status, incidents, daily] = await Promise.all([
+  const [status, daily] = await Promise.all([
     authedFetch('/status'),
-    authedFetch('/api/incidents?limit=30'),
     authedFetch('/api/daily?days=90'),
   ]);
 
@@ -532,6 +573,7 @@ async function load() {
     const barsHtml = bars.map(b => {
       const cls = barCls(b);
       return `<div class="bar ${cls}"
+        data-day="${b.day}"
         data-date="${fmtDay(b.day)}"
         data-pct="${b.data?.pct ?? ''}"
         data-checks="${b.data?.total ?? ''}"
@@ -558,36 +600,12 @@ async function load() {
       </div>`;
   }).join('');
 
-  // Incidents
-  const incCard = $('inc-card');
-  if (!incidents.length) {
-    incCard.innerHTML = `
-      <div class="no-inc">
-        <div class="no-inc-icon">✓</div>
-        No incidents recorded
-      </div>`;
-  } else {
-    incCard.innerHTML = incidents.map(inc => {
-      const isDown  = inc.event === 'down';
-      const detail  = [
-        inc.statusCode ? `HTTP ${inc.statusCode}` : null,
-        inc.error || null,
-      ].filter(Boolean).join(' · ');
-      return `
-        <div class="inc-item">
-          <div class="inc-icon ${inc.event}">${isDown ? '▼' : '▲'}</div>
-          <div class="inc-body">
-            <div class="inc-site">${inc.site}</div>
-            <span class="inc-tag ${inc.event}">${inc.event.toUpperCase()}</span>
-            ${detail ? `<div class="inc-detail">${detail}</div>` : ''}
-          </div>
-          <div class="inc-time">
-            <div class="ago">${timeAgo(inc.timestamp)}</div>
-            <div class="full">${new Date(inc.timestamp).toLocaleString()}</div>
-          </div>
-        </div>`;
-    }).join('');
-  }
+  // Incidents — blank by default, populated on bar click
+  $('inc-card').innerHTML = `
+    <div class="no-inc">
+      <div class="no-inc-icon" style="background:rgba(139,148,158,.12);color:var(--muted);font-size:16px">↑↓</div>
+      Click any day on the bars above to view incidents
+    </div>`;
 
   $('last-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
