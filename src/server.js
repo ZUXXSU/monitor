@@ -46,6 +46,27 @@ app.get('/api/checks', requireAuth, async (req, res) => {
   res.json(snap.docs.map((d) => ({ id: d.id, ...d.data(), timestamp: d.data().timestamp?.toDate?.() })));
 });
 
+// per-site daily aggregates (from daily_stats collection, max ~270 docs for 90 days × 3 sites)
+app.get('/api/daily', requireAuth, async (req, res) => {
+  const days = Math.min(Number(req.query.days) || 90, 90);
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceDay = since.toISOString().slice(0, 10);
+
+  const snap = await db.collection('daily_stats').where('day', '>=', sinceDay).get();
+  res.json(snap.docs.map((d) => {
+    const v = d.data();
+    return {
+      site: v.site,
+      day: v.day,
+      total: v.total,
+      up: v.up,
+      pct: v.total ? Math.round((v.up / v.total) * 100) : 0,
+      avgMs: v.total ? Math.round((v.totalMs || 0) / v.total) : null,
+    };
+  }));
+});
+
 // up/down transitions, newest first
 app.get('/api/incidents', requireAuth, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);

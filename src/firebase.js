@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { readFileSync } from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
 // On Vercel there's no file to mount, so the key is set as a raw JSON string in
@@ -14,3 +14,4 @@ const app = initializeApp({ credential: cert(serviceAccount) });
 
 export const db = getFirestore();
 export const authAdmin = getAuth(app);
+export { FieldValue };

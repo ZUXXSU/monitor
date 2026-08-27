@@ -2,90 +2,358 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>buzzit uptime monitor</title>
+<title>buzzit status</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { color-scheme: dark; }
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #0f1115; color: #e6e6e6; margin: 0; padding: 24px; }
-  h1 { font-size: 18px; margin: 0 0 16px; display: flex; align-items: center; justify-content: space-between; }
-  .cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
-  .card { background: #171a21; border: 1px solid #262a33; border-radius: 8px; padding: 14px 18px; min-width: 180px; }
-  .card .name { font-size: 13px; color: #9aa0aa; margin-bottom: 6px; }
-  .card .state { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-  .up .dot { background: #35d07f; }
-  .down .dot { background: #ff5c5c; }
-  .unknown .dot { background: #666; }
-  h2 { font-size: 14px; color: #9aa0aa; margin: 24px 0 8px; text-transform: uppercase; letter-spacing: .05em; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #20232b; }
-  th { color: #9aa0aa; font-weight: 500; }
-  tr.up-row { color: #35d07f; }
-  tr.down-row { color: #ff5c5c; }
-  .muted { color: #666; font-size: 12px; margin-top: 4px; }
-  #refreshed { color: #666; font-size: 12px; }
+  :root {
+    --bg:           #0d1117;
+    --surface:      #161b22;
+    --surface2:     #1c2128;
+    --border:       #30363d;
+    --text:         #e6edf3;
+    --muted:        #8b949e;
+    --green:        #2ea043;
+    --green-lite:   #3fb950;
+    --green-bg:     rgba(46,160,67,.12);
+    --green-bdr:    rgba(46,160,67,.28);
+    --yellow:       #d29922;
+    --yellow-lite:  #e3b341;
+    --yellow-bg:    rgba(210,153,34,.12);
+    --yellow-bdr:   rgba(210,153,34,.28);
+    --red:          #da3633;
+    --red-lite:     #f85149;
+    --red-bg:       rgba(218,54,51,.12);
+    --red-bdr:      rgba(218,54,51,.28);
+    --bar-none:     #21262d;
+    --bar-up:       #238636;
+    --bar-partial:  #d29922;
+    --bar-down:     #da3633;
+    --r:            8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
 
-  button { font: inherit; cursor: pointer; }
-  #signout-btn { background: #171a21; border: 1px solid #262a33; color: #e6e6e6; border-radius: 6px; padding: 6px 12px; font-size: 13px; }
-  #signout-btn:hover { background: #20232b; }
+  /* ── Login ───────────────────────────── */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 24px;
+  }
+  .login-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 36px 32px;
+    width: 100%; max-width: 380px;
+  }
+  .login-logo {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; margin-bottom: 28px;
+  }
+  .login-logo-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%; background: var(--green);
+  }
+  .login-logo h1 { font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+  .login-box input {
+    width: 100%; background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text);
+    font: inherit; padding: 9px 12px;
+    display: block; margin-bottom: 10px;
+  }
+  .login-box input:focus { outline: 2px solid var(--green); outline-offset: -1px; }
+  .login-box .submit-btn {
+    width: 100%; background: var(--green);
+    border: none; border-radius: 6px;
+    color: #fff; font: inherit; font-weight: 600;
+    padding: 9px 12px; cursor: pointer;
+    transition: background .15s;
+  }
+  .login-box .submit-btn:hover:not(:disabled) { background: var(--green-lite); }
+  .login-box .submit-btn:disabled { opacity: .55; cursor: default; }
+  #login-error {
+    color: var(--red-lite); font-size: 12px;
+    margin-top: 8px; min-height: 16px; text-align: center;
+  }
 
-  #login-screen { max-width: 320px; margin: 15vh auto 0; }
-  #login-screen h1 { justify-content: center; margin-bottom: 20px; }
-  #login-form { display: flex; flex-direction: column; gap: 10px; }
-  #login-form input { font: inherit; background: #171a21; border: 1px solid #262a33; color: #e6e6e6; border-radius: 6px; padding: 10px 12px; }
-  #login-form input:focus { outline: 1px solid #35d07f; }
-  #login-form button { background: #35d07f; border: none; color: #0f1115; font-weight: 600; border-radius: 6px; padding: 10px 12px; }
-  #login-form button:disabled { opacity: 0.6; cursor: default; }
-  #login-error { color: #ff5c5c; font-size: 13px; min-height: 16px; }
-
+  /* ── App ─────────────────────────────── */
   #app { display: none; }
+
+  /* ── Header ──────────────────────────── */
+  .hdr {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(13,17,23,.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px; height: 52px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .hdr-brand {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 700; letter-spacing: -.02em;
+  }
+  .hdr-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); transition: background .4s;
+    animation: hdr-pulse 2.5s infinite;
+  }
+  @keyframes hdr-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .hdr-right {
+    display: flex; align-items: center; gap: 12px;
+    color: var(--muted); font-size: 12px;
+  }
+  .btn-out {
+    background: transparent; border: 1px solid var(--border);
+    border-radius: 6px; color: var(--muted);
+    font: inherit; font-size: 12px;
+    padding: 4px 10px; cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .btn-out:hover { border-color: var(--muted); color: var(--text); }
+
+  /* ── Main ────────────────────────────── */
+  .main { max-width: 900px; margin: 0 auto; padding: 36px 32px 64px; }
+
+  /* ── Banner ──────────────────────────── */
+  .banner {
+    border-radius: var(--r); padding: 24px 28px;
+    margin-bottom: 40px;
+    display: flex; align-items: center; gap: 18px;
+    border: 1px solid transparent;
+    transition: background .4s, border-color .4s;
+  }
+  .banner.ok   { background: var(--green-bg);  border-color: var(--green-bdr); }
+  .banner.warn { background: var(--yellow-bg); border-color: var(--yellow-bdr); }
+  .banner.err  { background: var(--red-bg);    border-color: var(--red-bdr); }
+  .banner-icon {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; flex-shrink: 0;
+    transition: background .4s;
+  }
+  .banner.ok   .banner-icon { background: rgba(46,160,67,.2);  color: var(--green-lite); }
+  .banner.warn .banner-icon { background: rgba(210,153,34,.2); color: var(--yellow-lite); }
+  .banner.err  .banner-icon { background: rgba(218,54,51,.2);  color: var(--red-lite); }
+  .banner-body h2 { font-size: 18px; font-weight: 700; }
+  .banner.ok   .banner-body h2 { color: var(--green-lite); }
+  .banner.warn .banner-body h2 { color: var(--yellow-lite); }
+  .banner.err  .banner-body h2 { color: var(--red-lite); }
+  .banner-body p { color: var(--muted); font-size: 13px; margin-top: 3px; }
+
+  /* ── Section ─────────────────────────── */
+  .section { margin-bottom: 40px; }
+  .section-label {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* ── Services card ───────────────────── */
+  .svc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r); overflow: hidden;
+  }
+  .svc-row { padding: 18px 24px; border-bottom: 1px solid var(--border); }
+  .svc-row:last-child { border-bottom: none; }
+  .svc-hdr {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: 12px;
+  }
+  .svc-name { font-size: 14px; font-weight: 600; }
+  .svc-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 500;
+    padding: 3px 10px; border-radius: 20px;
+  }
+  .svc-badge.up      { background: rgba(46,160,67,.15);  color: var(--green-lite); }
+  .svc-badge.down    { background: rgba(218,54,51,.15);  color: var(--red-lite); }
+  .svc-badge.unknown { background: rgba(139,148,158,.15); color: var(--muted); }
+  .svc-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .svc-badge.up      .dot { background: var(--green-lite); animation: hdr-pulse 2s infinite; }
+  .svc-badge.down    .dot { background: var(--red-lite); }
+  .svc-badge.unknown .dot { background: var(--muted); }
+
+  /* ── Uptime bars ─────────────────────── */
+  .bars { display: flex; gap: 2px; height: 28px; }
+  .bar {
+    flex: 1; border-radius: 2px; min-width: 0;
+    transition: filter .1s, transform .1s;
+    cursor: default;
+  }
+  .bar:hover { filter: brightness(1.5); transform: scaleY(1.12); }
+  .bar.none    { background: var(--bar-none); }
+  .bar.up      { background: var(--bar-up); }
+  .bar.partial { background: var(--bar-partial); }
+  .bar.down    { background: var(--bar-down); }
+  .bars-foot {
+    display: flex; justify-content: space-between;
+    margin-top: 6px; font-size: 11px; color: var(--muted);
+  }
+  .bars-foot .stat { font-weight: 600; color: var(--text); }
+
+  /* ── Tooltip ─────────────────────────── */
+  #tooltip {
+    position: fixed;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px;
+    font-size: 12px; pointer-events: none;
+    z-index: 999; display: none; white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  }
+  #tooltip .tt-date  { color: var(--muted); margin-bottom: 3px; font-size: 11px; }
+  #tooltip .tt-stat  { font-weight: 600; }
+  #tooltip .ok   { color: var(--green-lite); }
+  #tooltip .warn { color: var(--yellow-lite); }
+  #tooltip .err  { color: var(--red-lite); }
+  #tooltip .dim  { color: var(--muted); }
+  #tooltip .tt-meta { color: var(--muted); margin-top: 3px; font-size: 11px; }
+
+  /* ── Incidents ───────────────────────── */
+  .inc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r); overflow: hidden;
+  }
+  .no-inc {
+    padding: 48px; text-align: center;
+    color: var(--muted); font-size: 13px;
+  }
+  .no-inc-icon {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(46,160,67,.15); color: var(--green-lite);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700;
+    margin: 0 auto 10px;
+  }
+  .inc-item {
+    display: flex; gap: 14px;
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .inc-item:last-child { border-bottom: none; }
+  .inc-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+  }
+  .inc-icon.down { background: rgba(218,54,51,.2);  color: var(--red-lite); }
+  .inc-icon.up   { background: rgba(46,160,67,.2);  color: var(--green-lite); }
+  .inc-body { flex: 1; min-width: 0; }
+  .inc-site { font-weight: 600; font-size: 14px; margin-bottom: 3px; }
+  .inc-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .05em;
+    padding: 2px 8px; border-radius: 4px; margin-bottom: 4px;
+  }
+  .inc-tag.down { background: rgba(218,54,51,.15); color: var(--red-lite); }
+  .inc-tag.up   { background: rgba(46,160,67,.15); color: var(--green-lite); }
+  .inc-detail { font-size: 12px; color: var(--muted); }
+  .inc-time { text-align: right; flex-shrink: 0; }
+  .inc-time .ago  { font-size: 13px; font-weight: 500; }
+  .inc-time .full { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Loading state ───────────────────── */
+  .placeholder { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* ── Footer ──────────────────────────── */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 32px; text-align: center;
+    color: var(--muted); font-size: 12px;
+  }
+
+  /* ── Responsive ──────────────────────── */
+  @media (max-width: 600px) {
+    .main  { padding: 20px 16px; }
+    .hdr   { padding: 0 16px; }
+    .svc-row  { padding: 14px 16px; }
+    .inc-item { padding: 12px 16px; }
+    .banner   { padding: 18px; gap: 14px; }
+    .banner-icon { width: 36px; height: 36px; font-size: 16px; }
+    .banner-body h2 { font-size: 16px; }
+    .inc-time .full { display: none; }
+  }
 </style>
 </head>
 <body>
 
-  <div id="login-screen">
-    <h1>buzzit uptime monitor</h1>
+<div id="tooltip"></div>
+
+<!-- ── Login ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-dot"></div>
+      <h1>buzzit status</h1>
+    </div>
     <form id="login-form">
-      <input type="email" id="login-email" placeholder="email" autocomplete="username" required>
-      <input type="password" id="login-password" placeholder="password" autocomplete="current-password" required>
-      <button type="submit" id="login-btn">Sign in</button>
+      <input type="email" id="login-email" placeholder="Email" autocomplete="username" required>
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" required>
+      <button type="submit" class="submit-btn" id="login-btn">Sign in</button>
       <div id="login-error"></div>
     </form>
   </div>
+</div>
 
-  <div id="app">
-    <h1>
-      buzzit uptime monitor
-      <button id="signout-btn">Sign out</button>
-    </h1>
-    <div class="cards" id="cards"></div>
+<!-- ── App ── -->
+<div id="app">
+  <header class="hdr">
+    <div class="hdr-brand">
+      <div class="hdr-dot" id="hdr-dot"></div>
+      buzzit status
+    </div>
+    <div class="hdr-right">
+      <span id="last-updated"></span>
+      <button class="btn-out" id="signout-btn">Sign out</button>
+    </div>
+  </header>
 
-    <h2>Incidents (up/down transitions)</h2>
-    <table id="incidents">
-      <thead><tr><th>Time</th><th>Site</th><th>Event</th><th>Status</th><th>Error</th></tr></thead>
-      <tbody></tbody>
-    </table>
+  <main class="main">
+    <div id="banner" class="banner ok">
+      <div class="banner-icon" id="banner-icon">✓</div>
+      <div class="banner-body">
+        <h2 id="banner-title">All Systems Operational</h2>
+        <p id="banner-sub">All services are running normally.</p>
+      </div>
+    </div>
 
-    <h2>Recent checks</h2>
-    <table id="checks">
-      <thead><tr><th>Time</th><th>Site</th><th>Up</th><th>Status</th><th>ms</th><th>Error</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="section">
+      <div class="section-label">Services</div>
+      <div class="svc-card" id="svc-card">
+        <div class="placeholder">Loading…</div>
+      </div>
+    </div>
 
-    <div id="refreshed"></div>
-  </div>
+    <div class="section">
+      <div class="section-label">Incident History</div>
+      <div class="inc-card" id="inc-card">
+        <div class="placeholder">Loading…</div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    buzzit uptime monitor &middot; auto-refreshes every 30s
+  </footer>
+</div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
-  getAuth,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
+  getAuth, signInWithEmailAndPassword,
+  signOut, onAuthStateChanged,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-// Client web config — safe to expose publicly, access is enforced by Firebase Auth,
-// not by hiding this. Server-side (src/authMiddleware.js) verifies the ID token.
+// Client web config — access enforced by Firebase Auth + server-side token verification.
 const firebaseConfig = {
   apiKey: "AIzaSyBZKPu4ylJ3gDqMC06X_cFys-44fM86akk",
   authDomain: "its-business-1d88b.firebaseapp.com",
@@ -95,97 +363,233 @@ const firebaseConfig = {
   appId: "1:56176915181:web:758e0c5928f5b59e77d2e4",
 };
 
-const fbApp = initializeApp(firebaseConfig);
-const auth = getAuth(fbApp);
+const fbApp  = initializeApp(firebaseConfig);
+const auth   = getAuth(fbApp);
+const $      = id => document.getElementById(id);
+const tooltip = $('tooltip');
+let timer = null;
 
-const loginScreen = document.getElementById('login-screen');
-const appScreen = document.getElementById('app');
-const loginForm = document.getElementById('login-form');
-const loginBtn = document.getElementById('login-btn');
-const loginError = document.getElementById('login-error');
-const signoutBtn = document.getElementById('signout-btn');
-
-let refreshTimer = null;
-
-loginForm.addEventListener('submit', async (e) => {
+// ── Auth ──────────────────────────────────────────────
+$('login-form').addEventListener('submit', async e => {
   e.preventDefault();
-  loginError.textContent = '';
-  loginBtn.disabled = true;
+  $('login-error').textContent = '';
+  $('login-btn').disabled = true;
   try {
-    await signInWithEmailAndPassword(
-      auth,
-      document.getElementById('login-email').value,
-      document.getElementById('login-password').value,
-    );
-  } catch (err) {
-    loginError.textContent = 'Sign in failed — check email/password.';
+    await signInWithEmailAndPassword(auth, $('login-email').value, $('login-password').value);
+  } catch {
+    $('login-error').textContent = 'Sign in failed — check email/password.';
   } finally {
-    loginBtn.disabled = false;
+    $('login-btn').disabled = false;
   }
 });
 
-signoutBtn.addEventListener('click', () => signOut(auth));
+$('signout-btn').addEventListener('click', () => signOut(auth));
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, user => {
   if (user) {
-    loginScreen.style.display = 'none';
-    appScreen.style.display = 'block';
+    $('login-screen').style.display = 'none';
+    $('app').style.display = 'block';
     load();
-    refreshTimer = setInterval(load, 30000);
+    timer = setInterval(load, 30000);
   } else {
-    loginScreen.style.display = 'block';
-    appScreen.style.display = 'none';
-    if (refreshTimer) clearInterval(refreshTimer);
+    $('login-screen').style.display = 'block';
+    $('app').style.display = 'none';
+    clearInterval(timer); timer = null;
   }
 });
 
 async function authedFetch(url) {
   const token = await auth.currentUser.getIdToken();
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (res.status === 401 || res.status === 403) {
-    await signOut(auth);
-    throw new Error('session expired');
-  }
+  if (res.status === 401 || res.status === 403) { await signOut(auth); throw new Error('auth'); }
   return res.json();
 }
 
+// ── Tooltip ───────────────────────────────────────────
+document.addEventListener('mousemove', e => {
+  const bar = e.target.closest('.bar');
+  if (!bar) { tooltip.style.display = 'none'; return; }
+
+  const { date, pct, checks, ms, cls } = bar.dataset;
+  let statHtml;
+  if (cls === 'none')    statHtml = `<div class="tt-stat dim">No data</div>`;
+  else if (cls === 'up') statHtml = `<div class="tt-stat ok">100% uptime</div>`;
+  else if (cls === 'partial') statHtml = `<div class="tt-stat warn">${pct}% uptime</div>`;
+  else                   statHtml = `<div class="tt-stat err">${pct}% uptime</div>`;
+
+  tooltip.innerHTML = `
+    <div class="tt-date">${date}</div>
+    ${statHtml}
+    ${checks ? `<div class="tt-meta">${checks} checks${ms ? ` · avg ${ms}ms` : ''}</div>` : ''}
+  `;
+  tooltip.style.display = 'block';
+
+  const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+  let tx = e.clientX + 14, ty = e.clientY - th - 10;
+  if (tx + tw > window.innerWidth - 8) tx = e.clientX - tw - 14;
+  if (ty < 8) ty = e.clientY + 14;
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top  = ty + 'px';
+});
+
+// ── Helpers ───────────────────────────────────────────
+function isoDay(date) {
+  return new Date(date - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function fmtDay(iso) {
+  return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+function timeAgo(ts) {
+  const s = Math.floor((Date.now() - new Date(ts)) / 1000);
+  if (s < 60)    return `${s}s ago`;
+  if (s < 3600)  return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
+
+function buildBars(daily, site) {
+  const map = {};
+  for (const d of daily) if (d.site === site) map[d.day] = d;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Array.from({ length: 90 }, (_, i) => {
+    const d = new Date(today); d.setDate(d.getDate() - (89 - i));
+    const day = isoDay(d);
+    return { day, data: map[day] || null };
+  });
+}
+
+function barCls(bar) {
+  if (!bar.data || !bar.data.total) return 'none';
+  if (bar.data.pct === 100) return 'up';
+  if (bar.data.pct >= 50)   return 'partial';
+  return 'down';
+}
+
+function siteUptimePct(daily, site) {
+  const rows = daily.filter(d => d.site === site);
+  if (!rows.length) return null;
+  const tot = rows.reduce((s, d) => s + d.total, 0);
+  const up  = rows.reduce((s, d) => s + d.up, 0);
+  return tot ? (up / tot * 100).toFixed(2) : null;
+}
+
+function siteAvgMs(daily, site) {
+  const rows = daily.filter(d => d.site === site && d.avgMs);
+  if (!rows.length) return null;
+  const tot = rows.reduce((s, d) => s + d.total, 0);
+  const wt  = rows.reduce((s, d) => s + d.avgMs * d.total, 0);
+  return tot ? Math.round(wt / tot) : null;
+}
+
+// ── Render ────────────────────────────────────────────
 async function load() {
-  const [status, incidents, checks] = await Promise.all([
+  const [status, incidents, daily] = await Promise.all([
     authedFetch('/status'),
-    authedFetch('/api/incidents?limit=50'),
-    authedFetch('/api/checks?limit=100'),
+    authedFetch('/api/incidents?limit=30'),
+    authedFetch('/api/daily?days=90'),
   ]);
 
-  const cardsEl = document.getElementById('cards');
-  cardsEl.innerHTML = status.sites.map(site => {
-    const up = status.lastState[site];
-    const cls = up === true ? 'up' : up === false ? 'down' : 'unknown';
-    const label = up === true ? 'UP' : up === false ? 'DOWN' : 'unknown';
-    return `<div class="card ${cls}"><div class="name">${site}</div><div class="state"><span class="dot"></span>${label}</div></div>`;
+  // Banner + header dot
+  const downCnt = status.sites.filter(s => status.lastState[s] === false).length;
+  const total   = status.sites.length;
+  const banner  = $('banner');
+  const dot     = $('hdr-dot');
+
+  if (downCnt === 0) {
+    banner.className = 'banner ok';
+    $('banner-icon').textContent = '✓';
+    $('banner-title').textContent = 'All Systems Operational';
+    $('banner-sub').textContent   = 'All services are running normally.';
+    dot.style.background = 'var(--green)';
+  } else if (downCnt < total) {
+    banner.className = 'banner warn';
+    $('banner-icon').textContent = '!';
+    $('banner-title').textContent = 'Partial System Outage';
+    $('banner-sub').textContent   = `${downCnt} of ${total} service${downCnt > 1 ? 's' : ''} experiencing issues.`;
+    dot.style.background = 'var(--yellow)';
+  } else {
+    banner.className = 'banner err';
+    $('banner-icon').textContent = '✕';
+    $('banner-title').textContent = 'Major System Outage';
+    $('banner-sub').textContent   = 'All services are currently down.';
+    dot.style.background = 'var(--red)';
+  }
+
+  // Services
+  $('svc-card').innerHTML = status.sites.map(site => {
+    const up    = status.lastState[site];
+    const bcls  = up === true ? 'up' : up === false ? 'down' : 'unknown';
+    const blabel = up === true ? 'Operational' : up === false ? 'Outage' : 'Unknown';
+
+    const bars  = buildBars(daily, site);
+    const upPct = siteUptimePct(daily, site);
+    const avgMs = siteAvgMs(daily, site);
+
+    const barsHtml = bars.map(b => {
+      const cls = barCls(b);
+      return `<div class="bar ${cls}"
+        data-date="${fmtDay(b.day)}"
+        data-pct="${b.data?.pct ?? ''}"
+        data-checks="${b.data?.total ?? ''}"
+        data-ms="${b.data?.avgMs ?? ''}"
+        data-cls="${cls}"></div>`;
+    }).join('');
+
+    const statsHtml = upPct !== null
+      ? `<span class="stat">${upPct}%</span> uptime${avgMs !== null ? ` &middot; avg ${avgMs}ms` : ''}`
+      : `<span style="color:var(--muted)">building history…</span>`;
+
+    return `
+      <div class="svc-row">
+        <div class="svc-hdr">
+          <div class="svc-name">${site}</div>
+          <div class="svc-badge ${bcls}"><div class="dot"></div>${blabel}</div>
+        </div>
+        <div class="bars">${barsHtml}</div>
+        <div class="bars-foot">
+          <span>Past 90 days</span>
+          <span>${statsHtml}</span>
+          <span>Today</span>
+        </div>
+      </div>`;
   }).join('');
 
-  const incBody = document.querySelector('#incidents tbody');
-  incBody.innerHTML = incidents.map(i => `
-    <tr class="${i.event === 'up' ? 'up-row' : 'down-row'}">
-      <td>${new Date(i.timestamp).toLocaleString()}</td>
-      <td>${i.site}</td>
-      <td>${i.event.toUpperCase()}</td>
-      <td>${i.statusCode ?? '-'}</td>
-      <td>${i.error ?? ''}</td>
-    </tr>`).join('') || '<tr><td colspan="5" class="muted">no incidents yet</td></tr>';
+  // Incidents
+  const incCard = $('inc-card');
+  if (!incidents.length) {
+    incCard.innerHTML = `
+      <div class="no-inc">
+        <div class="no-inc-icon">✓</div>
+        No incidents recorded
+      </div>`;
+  } else {
+    incCard.innerHTML = incidents.map(inc => {
+      const isDown  = inc.event === 'down';
+      const detail  = [
+        inc.statusCode ? `HTTP ${inc.statusCode}` : null,
+        inc.error || null,
+      ].filter(Boolean).join(' · ');
+      return `
+        <div class="inc-item">
+          <div class="inc-icon ${inc.event}">${isDown ? '▼' : '▲'}</div>
+          <div class="inc-body">
+            <div class="inc-site">${inc.site}</div>
+            <span class="inc-tag ${inc.event}">${inc.event.toUpperCase()}</span>
+            ${detail ? `<div class="inc-detail">${detail}</div>` : ''}
+          </div>
+          <div class="inc-time">
+            <div class="ago">${timeAgo(inc.timestamp)}</div>
+            <div class="full">${new Date(inc.timestamp).toLocaleString()}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
 
-  const chkBody = document.querySelector('#checks tbody');
-  chkBody.innerHTML = checks.map(c => `
-    <tr class="${c.up ? 'up-row' : 'down-row'}">
-      <td>${new Date(c.timestamp).toLocaleString()}</td>
-      <td>${c.site}</td>
-      <td>${c.up ? 'up' : 'down'}</td>
-      <td>${c.statusCode ?? '-'}</td>
-      <td>${c.responseTimeMs ?? '-'}</td>
-      <td>${c.error ?? ''}</td>
-    </tr>`).join('');
-
-  document.getElementById('refreshed').textContent = 'last refreshed ' + new Date().toLocaleTimeString();
+  $('last-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 </script>
 </body>

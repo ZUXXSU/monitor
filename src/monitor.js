@@ -1,4 +1,4 @@
-import { db } from './firebase.js';
+import { db, FieldValue } from './firebase.js';
 import { SITES, CHECK_TIMEOUT_MS } from './config.js';
 
 // site_state doc per site is the source of truth for last-known status —
@@ -59,6 +59,15 @@ export async function checkAllSites() {
       console.log(`[${timestamp.toISOString()}] ${site.name} changed state -> ${result.up ? 'UP' : 'DOWN'}`);
     }
     await stateRef.set({ up: result.up, statusCode: result.statusCode, updatedAt: timestamp });
+
+    const today = timestamp.toISOString().slice(0, 10);
+    await db.collection('daily_stats').doc(`${site.name}__${today}`).set({
+      site: site.name,
+      day: today,
+      total: FieldValue.increment(1),
+      up: FieldValue.increment(result.up ? 1 : 0),
+      totalMs: FieldValue.increment(result.responseTimeMs || 0),
+    }, { merge: true });
 
     console.log(`[${timestamp.toISOString()}] ${site.name} (${site.url}) up=${result.up} status=${result.statusCode} ${result.responseTimeMs}ms ${result.error || ''}`);
 
